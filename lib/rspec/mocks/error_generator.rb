@@ -328,8 +328,22 @@ module RSpec
       def __raise(message, backtrace_line=nil, source_id=nil)
         message = opts[:message] unless opts[:message].nil?
         exception = RSpec::Mocks::MockExpectationError.new(message)
+        filter_backtrace!(exception)
         prepend_to_backtrace(exception, backtrace_line) if backtrace_line
         notify exception, :source_id => source_id
+      end
+
+      def filter_backtrace!(exception)
+        backtrace = exception.backtrace || caller
+        source = backtrace.rindex { |l| l =~ /#{File::SEPARATOR}rspec-mocks(-[^#{File::SEPARATOR}]+)?#{File::SEPARATOR}/ }
+
+        unless source.nil?
+          backtrace = backtrace[(source+1)..-1]
+        end
+
+        unless backtrace.empty?
+          exception.set_backtrace(backtrace)
+        end
       end
 
       if RSpec::Support::Ruby.jruby?
@@ -340,7 +354,7 @@ module RSpec
         end
       else
         def prepend_to_backtrace(exception, line)
-          exception.set_backtrace(caller.unshift line)
+          exception.set_backtrace((exception.backtrace || caller).unshift line)
         end
       end
 
